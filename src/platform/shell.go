@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -35,6 +34,7 @@ const (
 	WINDOWS = "windows"
 	DARWIN  = "darwin"
 	LINUX   = "linux"
+	CMD     = "cmd"
 )
 
 func pid() string {
@@ -100,7 +100,7 @@ type Cache interface {
 	// In case the ttl expired, the function returns false.
 	Get(key string) (string, bool)
 	// Sets a value for a given key.
-	// The ttl indicates how may minutes to cache the value.
+	// The ttl indicates how many minutes to cache the value.
 	Set(key, value string, ttl int)
 	// Deletes a key from the cache.
 	Delete(key string)
@@ -608,12 +608,14 @@ func (env *Shell) CommandPath(command string) string {
 		env.Debug(path)
 		return path
 	}
-	path, err := exec.LookPath(command)
+
+	path, err := env.LookPath(command)
 	if err == nil {
 		env.cmdCache.set(command, path)
 		env.Debug(path)
 		return path
 	}
+
 	env.Error(err)
 	return ""
 }
@@ -628,6 +630,15 @@ func (env *Shell) HasCommand(command string) bool {
 
 func (env *Shell) StatusCodes() (int, string) {
 	defer env.Trace(time.Now())
+
+	if env.CmdFlags.Shell != CMD || !env.CmdFlags.NoExitCode {
+		return env.CmdFlags.ErrorCode, env.CmdFlags.PipeStatus
+	}
+
+	errorCode := env.Getenv("=ExitCode")
+	env.Debug(errorCode)
+	env.CmdFlags.ErrorCode, _ = strconv.Atoi(errorCode)
+
 	return env.CmdFlags.ErrorCode, env.CmdFlags.PipeStatus
 }
 
